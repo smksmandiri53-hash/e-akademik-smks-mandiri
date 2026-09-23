@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && profile().role == 'admin';
+    }
+
+    function isStaff() {
+      return signedIn() && profile().role in ['admin','guru','wali','operator'];
+    }
+
+    function isStudent() {
+      return signedIn() && profile().role == 'siswa';
+    }
+
+    match /users/{uid} {
+      // A user may read their own profile. Staff may read profiles.
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+      // Only Admin may create/edit/delete accounts' role/profile documents.
+      allow write: if isAdmin();
+    }
+
+    match /schoolData/{col}/items/{id} {
+      // Admin, Guru, Wali Kelas, and Operator can manage the academic system.
+      // This is the server-side protection; hiding buttons in the UI is not security.
+      allow read, write: if isStaff();
+
+      // Student: can read ONLY their own student record.
+      allow read: if isStudent()
+        && col == 'students'
+        && id == String(profile().studentId);
+
+      // Student: can update ONLY these personal fields.
+      // They cannot change identity, class, major, status, grades, attendance, behavior, etc.
+      allow update: if isStudent()
+        && col == 'students'
+        && id == String(profile().studentId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['address','parent','phone']);
+
+      // Student may read subject names.
+      allow read: if isStudent() && col == 'subjects';
+
+      // Student may read only records belonging to their own student ID.
+      allow read: if isStudent()
+        && col in ['grades','behavior','attendance','extra']
+        && resource.data.sid == String(profile().studentId);
+
+      // No student may create/delete academic records or other students.
+      allow create, delete: if false;
+    }
+
+    match /schoolData/settings {
+      allow read: if signedIn();
+      allow write: if isStaff();
+    }
+
+    match /profileRequests/{requestId} {
+      allow create: if isStudent() && request.resource.data.uid == request.auth.uid;
+      allow read: if isStaff() || (isStudent() && resource.data.uid == request.auth.uid);
+      allow update, delete: if isStaff();
+    }
+  }
+}

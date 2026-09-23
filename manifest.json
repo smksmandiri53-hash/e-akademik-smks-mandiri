@@ -1,0 +1,12 @@
+{
+  "name": "e-Akademik SMKS Mandiri Bandar Agung",
+  "short_name": "e-Akademik",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f7fb",
+  "theme_color": "#102a43",
+  "description": "Sistem informasi akademik SMKS Mandiri Bandar Agung berbasis web dengan opsi database online Firebase.",
+  "lang": "id-ID"
+}
